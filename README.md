@@ -144,5 +144,5 @@ is the same for all quarter hours of a 4-h block.
 
 ## Licence
 
-Copyright (c) 2026 Marco Obermeier. Code, documentation and example data are licensed under Creative Commons
-Attribution 4.0 International (CC BY 4.0), see `LICENSE`.
+Copyright (c) 2026 Marco Obermeier. Code, documentation and example data are licensed under the MIT License, see
+`LICENSE`.
