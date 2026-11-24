@@ -1,0 +1,6 @@
+# @package _global_
+# stage s1f: single decision per day, day-ahead forecast
+knowledge:
+  forecasts: [dayahead]
+decision:
+  gates: joint

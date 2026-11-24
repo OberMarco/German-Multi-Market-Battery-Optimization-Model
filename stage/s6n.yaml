@@ -1,0 +1,4 @@
+# @package _global_
+# stage s6n: real gates, forecast for every auction, naive continuous intraday
+knowledge:
+  forecasts: [dayahead, ida1, ida2, ida3, reserve]

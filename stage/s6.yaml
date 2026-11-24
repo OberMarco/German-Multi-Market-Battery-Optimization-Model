@@ -1,0 +1,4 @@
+# @package _global_
+# stage s6: real gates, forecast for every market
+knowledge:
+  forecasts: [dayahead, ida1, ida2, ida3, idc, reserve]

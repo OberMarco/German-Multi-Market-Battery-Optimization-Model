@@ -1,0 +1,4 @@
+# @package _global_
+# stage s1b: single decision per day, naive forecast
+decision:
+  gates: joint
