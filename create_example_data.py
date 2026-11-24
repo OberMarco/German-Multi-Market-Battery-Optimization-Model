@@ -13,8 +13,9 @@ import pandas as pd
 TZ = "Europe/Berlin"
 START, DAYS = "2026-03-07", 9  # two days of history, then one week of delivery from a Monday
 FORECAST_ERROR = {"dayahead": 15.0, "ida1": 10.0, "ida2": 8.0, "ida3": 6.0, "idc": 5.0}  # EUR/MWh, standard deviation
-# forecast issue time relative to 00:00 of the delivery day (local time), before the gate of its market
-ISSUED = {"reserve": -17, "dayahead": -14, "ida1": -11, "ida2": -4, "ida3": 8}
+# forecast issue time relative to 00:00 of the delivery day (local time), before the gate of its market; the
+# day-ahead forecast is out before 08:00 so that a joint decision (stage s1f) can use it
+ISSUED = {"reserve": -17, "dayahead": -17, "ida1": -11, "ida2": -4, "ida3": 8}
 IDC_AHEAD = 8  # quarter hours each continuous intraday forecast covers
 RESERVE_LEVEL = {"price_fcr": 12.0, "price_afrr_pos": 8.0, "price_afrr_neg": 6.0, "price_mfrr_pos": 2.0,
                  "price_mfrr_neg": 3.0}  # (EUR/MW)/h
