@@ -70,30 +70,48 @@ one market and selling in another in the same quarter hour needs no battery and 
 
 ## Stages
 
-| Stage | Decision | Knowledge | Further switches | Real prices, k EUR/MW/a (Sep / Oct 2026) |
-|---|---|---|---|---|
-| `s1` | one per day | perfect foresight | | 1001 (724) / 786 (632) |
-| `s1b` | one per day | naive | | 255 (0) / 166 (0) |
-| `s1f` | one per day | day-ahead forecast | | 274 (0) / 174 (0) |
-| `s3` | every gate | perfect foresight | | 1001 (724) / 786 (632) |
-| `s3o` | every gate | perfect foresight | no trading between markets | 419 (60) / 280 (67) |
-| `s4` | every gate | naive | | 258 (-1) / 167 (0) |
-| `s4o` | every gate | naive | no trading between markets | 258 (0) / 171 (1) |
-| `s5` | every gate | day-ahead forecast | | 274 (0) / 174 (0) |
-| `s6n` | every gate | forecast per auction, naive continuous intraday | | 273 (16) / 161 (6) |
-| `s6` | every gate | forecast per market | | 274 (28) / 176 (32) |
-| `s7` | bids at every gate | forecast per market | an auction trade needs an awarded bid | 245 (41) / 171 (33) |
-| `max` | bids at every gate | forecast per market | liquidity limit, balancing energy, price impact, reserve activation, outages, ageing, marketer share | 200 (28) / 132 (18) |
-
-Last column: net revenue of this model on real market prices of September and October 2026, for a battery of
-1 MW and 2 MWh (0.5 C), in k EUR per MW and year, extrapolated from the month. In brackets the part that comes from
-buying and selling the same quarter hour on two markets, which needs no battery. The prices and the forecasts of
-these runs (a time series foundation model) are not part of the repository, so the column cannot be reproduced
-with the example data.
+| Stage | Decision | Knowledge | Further switches |
+|---|---|---|---|
+| `s1` | one per day | perfect foresight | |
+| `s1b` | one per day | naive | |
+| `s1f` | one per day | day-ahead forecast | |
+| `s3` | every gate | perfect foresight | |
+| `s3o` | every gate | perfect foresight | no trading between markets |
+| `s4` | every gate | naive | |
+| `s4o` | every gate | naive | no trading between markets |
+| `s5` | every gate | day-ahead forecast | |
+| `s6n` | every gate | forecast per auction, naive continuous intraday | |
+| `s6` | every gate | forecast per market | |
+| `s7` | bids at every gate | forecast per market | an auction trade needs an awarded bid |
+| `max` | bids at every gate | forecast per market | liquidity limit, balancing energy, price impact, reserve activation, outages, ageing, marketer share |
 
 Naive: reserve and day-ahead prices as on the last known day, a later market at the price of the market before it.
 Published prices are used once they are out. With bids, a buy is limited at the 90 % quantile of the forecast and a
 sell at the 10 % quantile; what is not awarded is closed on the continuous intraday.
+
+## Results on real prices
+
+Net revenue of this model on real market prices of September and October 2026, for a battery of 1 MW and 2 MWh
+(0.5 C), in k EUR per MW and year, extrapolated from the month. "Between markets" is the part of the net revenue
+that comes from buying and selling the same quarter hour on two markets, which needs no battery.
+
+| Stage | Sep 2026: net revenue | Sep 2026: between markets | Oct 2026: net revenue | Oct 2026: between markets |
+|---|---|---|---|---|
+| `s1` | 1001 | 724 | 786 | 632 |
+| `s1b` | 255 | 0 | 166 | 0 |
+| `s1f` | 274 | 0 | 174 | 0 |
+| `s3` | 1001 | 724 | 786 | 632 |
+| `s3o` | 419 | 60 | 280 | 67 |
+| `s4` | 258 | -1 | 167 | 0 |
+| `s4o` | 258 | 0 | 171 | 1 |
+| `s5` | 274 | 0 | 174 | 0 |
+| `s6n` | 273 | 16 | 161 | 6 |
+| `s6` | 274 | 28 | 176 | 32 |
+| `s7` | 245 | 41 | 171 | 33 |
+| `max` | 200 | 28 | 132 | 18 |
+
+The prices and the forecasts of these runs (a time series foundation model) are not part of the repository, so the
+table cannot be reproduced with the example data.
 
 ## Data formats
 
