@@ -25,8 +25,10 @@ Q90 = 1.2816  # standard deviations between the median and the 90 % quantile of 
 def create_prices(rng, index):
     local = index.tz_convert(TZ)
     hour = local.hour + local.minute / 60
-    shape = 80 - 45 * np.exp(-((hour - 13) / 3.5) ** 2) + 50 * np.exp(-((hour - 19.5) / 1.8) ** 2)  # midday dip, evening peak
-    level = np.repeat(rng.normal(0, 12, len(index) // 96), 96)
+    # midday dip, evening peak
+    shape = 80 - 45 * np.exp(-((hour - 13) / 3.5) ** 2) + 50 * np.exp(-((hour - 19.5) / 1.8) ** 2)
+    day = pd.factorize(local.normalize())[0]
+    level = rng.normal(0, 12, day.max() + 1)[day]  # one price level per day
     p = pd.DataFrame(index=index)
     p["price_dayahead"] = shape + level + rng.normal(0, 6, len(index))
     p["price_ida1"] = p.price_dayahead + rng.normal(0, 12, len(index))

@@ -24,6 +24,7 @@ market before. Revenues are always settled at the real prices.
 
 Run: python multimarket_model.py [+stage=s4] [run.days=2] [<axis>.<switch>=<value>]
 """
+import logging
 from pathlib import Path
 
 import hydra
@@ -64,7 +65,8 @@ TIE_BREAK_EUR_PER_MWH = 0.01
 
 def read_prices(raw):
     """Real price per energy market (EUR/MWh) and reserve market ((EUR/MW)/h), UTC index without time zone."""
-    assert (raw.index.to_series().diff().dropna() == pd.Timedelta("15min")).all(), "price file is not 15 min without gaps"
+    step = raw.index.to_series().diff().dropna()
+    assert (step == pd.Timedelta("15min")).all(), "price file is not 15 min without gaps"
     prices = raw.set_axis(raw.index.tz_convert("UTC").tz_localize(None))
     out = prices[RESERVE_COLUMNS].copy()
     for name, (col, _) in MARKETS.items():
@@ -81,14 +83,22 @@ def read_reserve_marginal(raw):
 
 
 def read_forecasts(path, keys):
-    """Forecast table per price column for the markets in keys (reserve = all reserve columns), indexed by issue time."""
+    """Forecast table per price column for the markets in keys (reserve = all reserve columns), by issue time."""
     f = pd.read_parquet(path)
     columns = [c for k in keys for c in (RESERVE_COLUMNS if k == "reserve" else [k])]
-    utc = lambda s: pd.to_datetime(s, utc=True).dt.tz_localize(None).values
+
+    def utc(s):
+        return pd.to_datetime(s, utc=True).dt.tz_localize(None).values
+
     f = pd.DataFrame({"market": f.market.values, "target": utc(f.target_time), "value": f.value.values,
                       "q10": f.q10.values, "q90": f.q90.values},
                      index=pd.DatetimeIndex(utc(f.issue_time), name="issue")).sort_index()
     return {c: f[f.market == c].drop(columns="market") for c in columns}
+
+
+def read_gate(day, offset):
+    """UTC time at which the local clock shows 00:00 of the day plus offset, also on days with 23 or 25 hours."""
+    return (day.tz_localize(None) + offset).tz_localize(TZ).tz_convert("UTC").tz_localize(None)
 
 
 def read_events(local, gates):
@@ -97,12 +107,12 @@ def read_events(local, gates):
     day = local.normalize()
     events = []
     for d in day.unique():
-        on_day, start = (day == d), d.tz_convert("UTC").tz_localize(None)
+        on_day = day == d
         if gates == "joint":
-            events.append((start + RESERVE_CLOSE, "joint", on_day))
+            events.append((read_gate(d, RESERVE_CLOSE), "joint", on_day))
             continue
-        events.append((start + RESERVE_CLOSE, "reserve", on_day))
-        events += [(start + close, name, on_day) for name, (_, close) in MARKETS.items() if close is not None]
+        events.append((read_gate(d, RESERVE_CLOSE), "reserve", on_day))
+        events += [(read_gate(d, close), name, on_day) for name, (_, close) in MARKETS.items() if close is not None]
     if gates != "joint":
         events += [(t - IDC_DECISION, "idc", utc == t) for t in utc]
     return sorted(events, key=lambda e: (e[0], EVENT_ORDER[e[1]]))
@@ -111,12 +121,12 @@ def read_events(local, gates):
 def read_published(local):
     """Time (UTC) from which each real price is known, per column; continuous intraday: once the quarter hour starts."""
     utc = local.tz_convert("UTC").tz_localize(None)
-    start = local.normalize().tz_convert("UTC").tz_localize(None)
-    out = pd.DataFrame({name: start + close + PUBLISHED[name]
+    day = local.normalize()
+    out = pd.DataFrame({name: read_gate(day, close) + PUBLISHED[name]
                         for name, (_, close) in MARKETS.items() if close is not None}, index=utc)
     out["idc"] = out["imbalance"] = utc
     for col in RESERVE_COLUMNS:
-        out[col] = start + RESERVE_CLOSE + PUBLISHED["reserve"]
+        out[col] = read_gate(day, RESERVE_CLOSE) + PUBLISHED["reserve"]
     return out
 
 
@@ -151,7 +161,7 @@ def read_plan_known(prices, local, published, window, t, forecasts):
         p.loc[gap, col] = read_forecast(forecasts.get(col), t, p.index)[gap]
         gap &= p[col].isna().values
         seen = published[col].le(t).values & prices[col].notna().values
-        if gap.any() and col in RESERVE_COLUMNS + ["dayahead"] and seen.any():
+        if gap.any() and col in [*RESERVE_COLUMNS, "dayahead"] and seen.any():
             p.loc[gap, col] = read_day_profile(prices[col], local, local[seen].normalize().max(),
                                                np.flatnonzero(window)[gap])
         elif gap.any() and before is not None:
@@ -242,7 +252,7 @@ def create_network(snapshots, prices, battery, soc_initial, fixed, costs, idc_co
 def read_battery_variable(m, name):
     """One StorageUnit variable of the battery, indexed by snapshot only."""
     v = m[f"StorageUnit-{name}"]
-    return v.sel({[d for d in v.dims if d != "snapshot"][0]: "battery"})
+    return v.sel({next(d for d in v.dims if d != "snapshot"): "battery"})
 
 
 def create_reserve(m, snapshots, prices, battery, blocks, fixed_reserve):
@@ -289,7 +299,7 @@ def create_one_side(m, snapshots, P, fixed):
     """Per step the open trades of all markets either buy or sell, at most the battery power (earlier positions do not
     count, so a later market may trade them back)."""
     p = m["Generator-p"]
-    dim = [d for d in p.dims if d != "snapshot"][0]
+    dim = next(d for d in p.dims if d != "snapshot")
     w = m.add_variables(binary=True, coords=[snapshots], name="buy_mode")
     for side, sign, bound in (("buy", 1, P * w), ("sell", -1, P * (1 - w))):
         names = [f"{k}_{side}" for k in MARKETS]
@@ -351,7 +361,7 @@ def create_schedule(prices, local, battery, costs, decision_prices, forecasts, m
         p = decision_prices(prices, local, published, window, t, forecasts)
         n = create_network(snapshots, p, battery, soc, fixed, costs, idc_cover=bids is not None,
                            tie_break=TIE_BREAK_EUR_PER_MWH if kind == "joint" else 0.0)
-        status = n.optimize(solver_name=cfg.solver.name, **dict(cfg.solver.options),
+        status = n.optimize(solver_name=cfg.solver.name, include_objective_constant=True, **dict(cfg.solver.options),
                             extra_functionality=create_constraints(
                                 p, battery, blocks[window], {k: v[window] for k, v in fixed_reserve.items()}, fixed,
                                 cfg.markets.spread_trading))
@@ -440,7 +450,8 @@ def render_summary(prices, res, battery, costs):
     # part of the energy revenue above that comes from buying in one market and selling in another in the same
     # quarter hour, without the battery: reported, not added to the total
     matched, between = read_between_markets(prices, res, dt_h)
-    summary.loc["between_markets"] = {"revenue_eur": between, "cost_eur": 0.0, "volume_mwh": matched, "net_eur": between}
+    summary.loc["between_markets"] = {"revenue_eur": between, "cost_eur": 0.0, "volume_mwh": matched,
+                                      "net_eur": between}
     hours = len(res) * dt_h
     per_mw_year = 8760 / hours / battery["power_mw"] / 1000
     print(summary.round(2).to_string())
@@ -468,8 +479,8 @@ def render_schedule(prices, res, path, days=7):
     names = ["price", "dayahead", "ida", "idc", "battery", "soc", "reserve"]
     fig, axes = plt.subplots(len(names), 1, figsize=(7.2, 8.4), sharex=True,
                              gridspec_kw={"height_ratios": [2, 0.8, 0.8, 0.8, 0.8, 0.8, 1], "hspace": 0.35})
-    ax = dict(zip(names, axes))
-    step = dict(where="post", linewidth=0.9)
+    ax = dict(zip(names, axes, strict=True))
+    step = {"where": "post", "linewidth": 0.9}
     ax["price"].step(x, p.dayahead, color=colors["dayahead"], label="day-ahead", **step)
     for k, style in (("ida1", "-"), ("ida2", "--"), ("ida3", ":")):
         ax["price"].step(x, p[k], color=colors["ida"], linestyle=style, label=k.upper(), **step)
@@ -485,7 +496,8 @@ def render_schedule(prices, res, path, days=7):
         ax["reserve"].step(x, -r[f"reserve_{k}_neg_mw"], color=colors[k], **step)
     ax["reserve"].legend(ncol=3, frameon=False, loc="lower right", bbox_to_anchor=(1, 1.0), fontsize=6)
     labels = {"price": "EUR/MWh", "dayahead": "day-ahead\nsold MW", "ida": "IDA1-3\nsold MW", "idc": "IDC\nsold MW",
-              "battery": "battery MW\n(+ discharge)", "soc": "state of\ncharge MWh", "reserve": "reserve MW\n(+ pos, - neg)"}
+              "battery": "battery MW\n(+ discharge)", "soc": "state of\ncharge MWh",
+              "reserve": "reserve MW\n(+ pos, - neg)"}
     for k, label in labels.items():
         ax[k].set_ylabel(label, rotation=0, ha="right", va="center")
     ax["reserve"].xaxis.set_major_locator(mdates.DayLocator())
@@ -498,6 +510,8 @@ def render_schedule(prices, res, path, days=7):
 @hydra.main(version_base=None, config_path=".", config_name="config")
 def main(cfg: DictConfig):
     root = Path(hydra.utils.get_original_cwd())
+    for name in ("pypsa", "linopy"):  # one line per run instead of several per event
+        logging.getLogger(name).setLevel(logging.ERROR)
     out = root / cfg.run.output_dir
     out.mkdir(parents=True, exist_ok=True)
     raw = pd.read_parquet(root / cfg.data.prices)
@@ -505,12 +519,13 @@ def main(cfg: DictConfig):
     b, mk, ph, co = cfg.battery, cfg.markets, cfg.physics, cfg.costs
     if cfg.decision.gates == "joint" and (ph.activation or cfg.decision.bids):
         raise ValueError("physics.activation and decision.bids need decision.gates=real")
-    battery = dict(power_mw=b.power_mw, capacity_mwh=b.capacity_mwh, soc_initial=b.initial_soc,
-                   eff_charge=b.charge_efficiency, eff_discharge=b.discharge_efficiency, dt_h=0.25,
-                   reserve_hours=dict(ph.reserve_hours), fcr_power_share=ph.fcr_power_share, min_bid_mw=ph.min_bid_mw,
-                   availability=ph.availability, idc_liquidity_mw=mk.idc_liquidity_mw, imbalance=mk.imbalance,
-                   activation=pd.read_parquet(root / cfg.data.activation) if ph.activation else None,
-                   degradation_eur_per_mwh=co.degradation_eur_per_mwh, marketer_share=co.marketer_share)
+    battery = {"power_mw": b.power_mw, "capacity_mwh": b.capacity_mwh, "soc_initial": b.initial_soc,
+               "eff_charge": b.charge_efficiency, "eff_discharge": b.discharge_efficiency, "dt_h": 0.25,
+               "reserve_hours": dict(ph.reserve_hours), "fcr_power_share": ph.fcr_power_share,
+               "min_bid_mw": ph.min_bid_mw, "availability": ph.availability, "idc_liquidity_mw": mk.idc_liquidity_mw,
+               "imbalance": mk.imbalance,
+               "activation": pd.read_parquet(root / cfg.data.activation) if ph.activation else None,
+               "degradation_eur_per_mwh": co.degradation_eur_per_mwh, "marketer_share": co.marketer_share}
     costs = read_costs(prices.index, co.fee_eur_per_mwh, co.spread_eur_per_mwh, mk.price_impact_eur_per_mwh,
                        mk.imbalance_surcharge_eur_per_mwh)
     keys = list(cfg.knowledge.forecasts)
@@ -518,7 +533,7 @@ def main(cfg: DictConfig):
     res = create_schedule(prices, local, battery, costs, DECISION_PRICES[cfg.knowledge.decision_prices], forecasts,
                           read_reserve_marginal(raw) if cfg.decision.bids else None, cfg)
     summary = render_summary(prices.loc[res.index], res, battery, costs)
-    res.to_csv(out / "results.csv")
+    res.rename_axis("timestamp_utc").to_csv(out / "results.csv")
     summary.to_csv(out / "summary.csv")
     render_schedule(prices, res, out / "schedule.pdf")
     print(f"results in {out}")

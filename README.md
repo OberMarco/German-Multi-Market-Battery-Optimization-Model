@@ -22,8 +22,8 @@ python multimarket_model.py +stage=max costs.marketer_share=0 physics.availabili
 
 One delivery day takes one to two minutes with a decision at every gate and a few seconds with one decision per day;
 the default call computes the seven delivery days of the example data (about nine minutes). Start the model from the
-repository folder. A run writes `results.csv` (one row per quarter hour), `summary.csv`
-(revenue per market) and `schedule.pdf` to `run.output_dir`.
+repository folder; Hydra keeps its own log of each run in `outputs/`. A run writes `results.csv` (one row per quarter
+hour), `summary.csv` (revenue per market) and `schedule.pdf` to `run.output_dir`.
 
 | File | Content |
 |---|---|
