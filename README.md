@@ -141,3 +141,8 @@ is the same for all quarter hours of a 4-h block.
 - Activated reserve energy is worth the continuous intraday price; outages cost revenue in proportion to time.
 - Balancing energy costs the continuous intraday price plus a surcharge.
 - Values in `stage/max.yaml` and `config.yaml` marked as assumption have no source.
+
+## Licence
+
+Copyright (c) 2026 Marco Obermeier. Code, documentation and example data are licensed under Creative Commons
+Attribution 4.0 International (CC BY 4.0), see `LICENSE`.
