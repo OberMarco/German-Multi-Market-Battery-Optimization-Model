@@ -1,0 +1,6 @@
+# @package _global_
+# stage s7: stage 6 with bids: an auction trade only happens if the bid is awarded
+knowledge:
+  forecasts: [dayahead, ida1, ida2, ida3, idc, reserve]
+decision:
+  bids: q90

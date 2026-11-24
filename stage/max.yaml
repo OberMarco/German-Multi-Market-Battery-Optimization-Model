@@ -1,0 +1,19 @@
+# @package _global_
+# stage max: stage 7 plus every part of reality the model has a switch for
+knowledge:
+  forecasts: [dayahead, ida1, ida2, ida3, idc, reserve]
+decision:
+  bids: q90
+markets:
+  idc_liquidity_mw: 1.0     # assumption: per quarter hour and side the continuous intraday takes the battery power
+  imbalance: true
+  imbalance_surcharge_eur_per_mwh: 45.6  # assumption
+  price_impact_eur_per_mwh: 0.1  # assumption: a 1 MW order moves the price by 0.1 EUR/MWh against the battery
+physics:
+  activation: true
+  availability: 0.97        # assumption
+costs:
+  # assumption: CAPEX 125 EUR/kWh x capacity fade 2 % per 1000 full cycles / 20 % fade until end of life
+  # = 12.5 EUR/MWh discharged; cycle ageing as a cost per MWh follows Xu et al. 2016, doi 10.1109/TSG.2016.2578950
+  degradation_eur_per_mwh: 12.5
+  marketer_share: 0.10      # assumption: revenue share 90:10

@@ -1,0 +1,6 @@
+# @package _global_
+# stage s1: single decision per day, perfect foresight
+knowledge:
+  decision_prices: perfect
+decision:
+  gates: joint

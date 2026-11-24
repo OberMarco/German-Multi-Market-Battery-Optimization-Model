@@ -1,0 +1,4 @@
+# @package _global_
+# stage s4o: real gates, naive forecast, no trading between markets
+markets:
+  spread_trading: false

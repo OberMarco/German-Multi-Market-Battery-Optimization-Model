@@ -1,0 +1,10 @@
+name: battery-multimarket
+channels:
+  - conda-forge
+dependencies:
+  - python=3.13
+  - pypsa=1.2
+  - highspy
+  - hydra-core=1.3
+  - pyarrow
+  - matplotlib

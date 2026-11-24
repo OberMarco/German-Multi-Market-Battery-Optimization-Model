@@ -1,0 +1,6 @@
+__pycache__/
+.hydra/
+outputs/
+# only the synthetic example files are part of the repository; market prices are not
+data/*
+!data/example_*.parquet

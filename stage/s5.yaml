@@ -1,0 +1,4 @@
+# @package _global_
+# stage s5: real gates, day-ahead forecast
+knowledge:
+  forecasts: [dayahead]

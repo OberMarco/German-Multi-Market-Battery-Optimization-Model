@@ -1,0 +1,66 @@
+# Battery, data and the switches of the model, grouped by the five axes markets, knowledge, decision, physics, costs.
+# A stage file in stage/ sets the switches that differ from here: python multimarket_model.py +stage=s4
+
+battery:
+  power_mw: 1.0             # charge and discharge
+  capacity_mwh: 2.0
+  initial_soc: 0.5          # share of the capacity at the start
+  charge_efficiency: 0.95
+  discharge_efficiency: 0.95
+
+data:                       # synthetic example files, written by create_example_data.py; formats in README.md
+  prices: data/example_prices.parquet
+  forecasts: data/example_forecasts.parquet
+  activation: data/example_activation.parquet
+
+solver:
+  name: highs
+  options:                  # per optimisation
+    time_limit: 60          # s; the best solution found so far is used, the run lists such events
+    mip_rel_gap: 0.001
+    log_to_console: false
+
+markets:
+  spread_trading: true      # buy in one market and sell in another for the same quarter hour without the battery
+                            # (allowed in reality); false: the open trades of a decision either buy or sell
+  idc_liquidity_mw: null    # MW the continuous intraday takes per quarter hour and side; null = 2 x battery power
+  imbalance: false          # true: what is left open at delivery is settled as balancing energy
+  imbalance_surcharge_eur_per_mwh: 0.0  # balancing energy price over the continuous intraday price
+  price_impact_eur_per_mwh: 0.0  # price moved against the battery per traded MWh, all energy markets
+
+knowledge:
+  decision_prices: known    # perfect: every decision knows all real prices | known: only published prices
+  forecasts: []             # markets planned with data.forecasts: dayahead, ida1, ida2, ida3, idc, reserve;
+                            # the others repeat the last known day (reserve, day-ahead) or the market before
+
+decision:
+  gates: real               # real: reserve, day-ahead, IDA1-IDA3, continuous intraday every 15 min | joint: one
+                            # decision per day for all markets
+  lookahead_days: 1         # days planned after the delivery day, decided again later
+  bids: null                # null: every optimised trade is done | q90 | median: the auctions get bids with limits
+                            # from the forecast (buy q90, sell q10 | both median), awarded at the real clearing price;
+                            # the continuous intraday closes what is left open
+
+physics:
+  reserve_hours:            # h of delivery the state of charge must cover per reserved MW, both directions
+    FCR: 0.25               # German prequalification rules (PQ-Bedingungen 2024), section 3.1.6, eq. 3.7/3.8
+    aFRR_pos: 1.0           # PQ-Bedingungen 2024, section 2.7.1: 60 min of the marketable power
+    aFRR_neg: 1.0
+    mFRR_pos: 1.0
+    mFRR_neg: 1.0
+  fcr_power_share: 0.8      # max FCR as share of the battery power (PQ-Bedingungen 2024, eq. 3.9)
+  min_bid_mw: 0             # reserve per product 0 or at least this; 1 = minimum offer without a pool, 0 = in a pool
+  activation: false         # true: aFRR and mFRR are activated with the shares in data.activation
+  availability: 1.0         # share of the time the battery is available; revenue scaled by it
+
+costs:
+  fee_eur_per_mwh: 0.10     # per traded MWh, buy and sell, every energy market (assumption)
+  spread_eur_per_mwh: 7.30  # bid-ask spread of a continuous intraday trade, half of it paid per MWh; mean first-limit
+                            # spread, EPEX DE/FR intraday 2021 (Bergault & Cogneville 2024, arXiv 2410.06839),
+                            # measured on hourly products; taken for quarter hours as an assumption
+  degradation_eur_per_mwh: 0.0  # ageing cost per MWh discharged
+  marketer_share: 0.0       # share of the net revenue paid to the marketer
+
+run:
+  days: null                # number of delivery days; null = whole price file
+  output_dir: outputs/run   # results, summary and week plot of this run

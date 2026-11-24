@@ -1,0 +1,4 @@
+# @package _global_
+# stage s3: real gates, perfect foresight
+knowledge:
+  decision_prices: perfect

@@ -1,0 +1,6 @@
+# @package _global_
+# stage s3o: real gates, perfect foresight, no trading between markets
+markets:
+  spread_trading: false
+knowledge:
+  decision_prices: perfect
