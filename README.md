@@ -129,13 +129,13 @@ that comes from buying and selling the same quarter hour on two markets, which n
 
 | Stage | Sep 2026: net revenue | Sep 2026: between markets | Oct 2026: net revenue | Oct 2026: between markets |
 |---|---|---|---|---|
-| `s1` | 1001 | 724 | 786 | 632 |
+| `s1` | 1001 | 724 | 787 | 633 |
 | `s1b` | 255 | 0 | 166 | 0 |
 | `s1f` | 274 | 0 | 174 | 0 |
-| `s3` | 1001 | 724 | 786 | 632 |
+| `s3` | 1001 | 724 | 787 | 633 |
 | `s3o` | 419 | 60 | 280 | 67 |
 | `s4` | 258 | -1 | 167 | 0 |
-| `s4o` | 258 | 0 | 171 | 1 |
+| `s4o` | 258 | 0 | 170 | 1 |
 | `s5` | 274 | 0 | 174 | 0 |
 | `s6n` | 273 | 16 | 161 | 6 |
 | `s6` | 274 | 28 | 176 | 32 |
@@ -143,9 +143,10 @@ that comes from buying and selling the same quarter hour on two markets, which n
 | `max` | 200 | 28 | 132 | 18 |
 
 The prices and the forecasts of these runs (a time series foundation model) are not part of the repository, so the
-table cannot be reproduced with the example data. On 25 October 2026 (clock change, 25 hours) these runs planned
-without the look-ahead to the following day; the model in this repository plans with it, so a new run of October can
-differ slightly.
+table cannot be reproduced with the example data. The October values of `s1`, `s1b`, `s3`, `s4` and
+`s4o` are computed with the model as it stands here. The other October values stem from runs that planned 25 October
+2026 (clock change, 25 hours) without the look-ahead to the following day; in the rows computed anew this changed
+the result by about 0.1 %.
 
 ## Data formats
 
