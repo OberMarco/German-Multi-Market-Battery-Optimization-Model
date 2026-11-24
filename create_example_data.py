@@ -12,7 +12,7 @@ import pandas as pd
 
 TZ = "Europe/Berlin"
 START, DAYS = "2026-03-07", 9  # two days of history, then one week of delivery from a Monday
-FORECAST_ERROR = {"dayahead": 15.0, "ida1": 10.0, "ida2": 8.0, "ida3": 6.0, "idc": 5.0}  # EUR/MWh, standard deviation
+FORECAST_ERROR = {"dayahead": 5.0, "ida1": 10.0, "ida2": 8.0, "ida3": 6.0, "idc": 5.0}  # EUR/MWh, standard deviation
 # forecast issue time relative to 00:00 of the delivery day (local time), before the gate of its market; the
 # day-ahead forecast is out before 08:00 so that a joint decision (stage s1f) can use it
 ISSUED = {"reserve": -17, "dayahead": -17, "ida1": -11, "ida2": -4, "ida3": 8}
@@ -64,7 +64,7 @@ def create_forecasts(rng, prices):
             for col, level in RESERVE_LEVEL.items():
                 add(col, issue, prices.index[on_day], prices.loc[on_day, col].values, 0.3 * level, block)
     for i in range(96, len(prices) - IDC_AHEAD):  # every quarter hour for the next two hours
-        targets = prices.index[i + 2:i + 2 + IDC_AHEAD]
+        targets = prices.index[i + 1:i + 1 + IDC_AHEAD]
         add("idc", prices.index[i], targets, prices.loc[targets, "price_id1"].values, FORECAST_ERROR["idc"])
     return pd.concat(parts, ignore_index=True).round(2)
 

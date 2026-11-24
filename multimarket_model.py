@@ -330,9 +330,9 @@ def create_schedule(prices, local, battery, costs, decision_prices, forecasts, m
     """Walk through all events in time order. Returns one row per delivered quarter hour with positions, reserve and
     battery. With decision.bids the auctions get bids, awarded by create_awards; else every optimised trade is done."""
     gates, bids = cfg.decision.gates, cfg.decision.bids
-    first_day = local[0].normalize() + pd.Timedelta(days=HISTORY_DAYS)
+    first_day = local[0].normalize() + pd.DateOffset(days=HISTORY_DAYS)  # calendar days: a day has 23 to 25 h
     if cfg.run.days is not None:
-        keep = local.normalize() < first_day + pd.Timedelta(days=cfg.run.days)
+        keep = local.normalize() < first_day + pd.DateOffset(days=cfg.run.days)
         prices, local, costs = prices[keep], local[keep], costs[keep]
     day = local.normalize()
     blocks = np.array([f"{t:%Y-%m-%d}_{t.hour // BLOCK_HOURS}" for t in local])
@@ -346,7 +346,7 @@ def create_schedule(prices, local, battery, costs, decision_prices, forecasts, m
     for t, kind, target in read_events(local, gates):
         if done[target].all():
             continue
-        window = ~done & (day <= day[target].max() + pd.Timedelta(days=cfg.decision.lookahead_days))
+        window = ~done & (day <= day[target].max() + pd.DateOffset(days=cfg.decision.lookahead_days))
         snapshots, own = prices.index[window], target[window]
         p = decision_prices(prices, local, published, window, t, forecasts)
         n = create_network(snapshots, p, battery, soc, fixed, costs, idc_cover=bids is not None,
@@ -355,9 +355,11 @@ def create_schedule(prices, local, battery, costs, decision_prices, forecasts, m
                             extra_functionality=create_constraints(
                                 p, battery, blocks[window], {k: v[window] for k, v in fixed_reserve.items()}, fixed,
                                 cfg.markets.spread_trading))
+        if "infeasible" in status[1] or "unbounded" in status[1]:
+            raise RuntimeError(f"event {kind} at {t} has no solution: {status}")
         if status != ("ok", "optimal"):
             not_optimal.append((str(t), kind, status))
-        x = {k: n.model.solution[f"reserve_{k}"].values[own] for k in RESERVE_MARKETS}
+        x = {k: n.model.variables[f"reserve_{k}"].solution.values[own] for k in RESERVE_MARKETS}
         x |= {g: n.generators_t.p[g].values[own] for g in n.generators.index}
         if bids is not None and kind in ("reserve", "dayahead", "ida1", "ida2", "ida3"):
             x, price = create_awards(kind, t, snapshots[own], x, prices, p[own], forecasts, BID_LIMITS[bids], marginal)
@@ -375,8 +377,8 @@ def create_schedule(prices, local, battery, costs, decision_prices, forecasts, m
                 rows[q] = {"p_battery": n.storage_units_t.p.at[q, "battery"],
                            "soc": n.storage_units_t.state_of_charge.at[q, "battery"]}
                 if battery["activation"] is not None:
-                    rows[q]["soc_breach_mwh"] = float(n.model.solution["soc_breach"].sel(snapshot=q))
-                    rows[q]["headroom_short_mw"] = float(n.model.solution["headroom_short"].sel(snapshot=q))
+                    rows[q]["soc_breach_mwh"] = float(n.model.variables["soc_breach"].solution.sel(snapshot=q))
+                    rows[q]["headroom_short_mw"] = float(n.model.variables["headroom_short"].solution.sel(snapshot=q))
             done |= target
             soc = rows[snapshots[own][-1]]["soc"]
             if battery["activation"] is not None:
@@ -501,6 +503,8 @@ def main(cfg: DictConfig):
     raw = pd.read_parquet(root / cfg.data.prices)
     prices, local = read_prices(raw), raw.index.tz_convert(TZ)
     b, mk, ph, co = cfg.battery, cfg.markets, cfg.physics, cfg.costs
+    if cfg.decision.gates == "joint" and (ph.activation or cfg.decision.bids):
+        raise ValueError("physics.activation and decision.bids need decision.gates=real")
     battery = dict(power_mw=b.power_mw, capacity_mwh=b.capacity_mwh, soc_initial=b.initial_soc,
                    eff_charge=b.charge_efficiency, eff_discharge=b.discharge_efficiency, dt_h=0.25,
                    reserve_hours=dict(ph.reserve_hours), fcr_power_share=ph.fcr_power_share, min_bid_mw=ph.min_bid_mw,
@@ -512,7 +516,7 @@ def main(cfg: DictConfig):
     keys = list(cfg.knowledge.forecasts)
     forecasts = read_forecasts(root / cfg.data.forecasts, keys) if keys else {}
     res = create_schedule(prices, local, battery, costs, DECISION_PRICES[cfg.knowledge.decision_prices], forecasts,
-                          read_reserve_marginal(raw), cfg)
+                          read_reserve_marginal(raw) if cfg.decision.bids else None, cfg)
     summary = render_summary(prices.loc[res.index], res, battery, costs)
     res.to_csv(out / "results.csv")
     summary.to_csv(out / "summary.csv")
