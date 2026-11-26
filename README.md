@@ -133,20 +133,17 @@ that comes from buying and selling the same quarter hour on two markets, which n
 | `s1b` | 255 | 0 | 166 | 0 |
 | `s1f` | 274 | 0 | 174 | 0 |
 | `s3` | 1001 | 724 | 787 | 633 |
-| `s3o` | 419 | 60 | 280 | 67 |
+| `s3o` | 419 | 60 | 280 | 69 |
 | `s4` | 258 | -1 | 167 | 0 |
 | `s4o` | 258 | 0 | 170 | 1 |
 | `s5` | 274 | 0 | 174 | 0 |
 | `s6n` | 273 | 16 | 161 | 6 |
-| `s6` | 274 | 28 | 176 | 32 |
-| `s7` | 245 | 41 | 171 | 33 |
-| `max` | 200 | 28 | 132 | 18 |
+| `s6` | 274 | 28 | 177 | 34 |
+| `s7` | 245 | 41 | 173 | 35 |
+| `max` | 200 | 28 | 133 | 18 |
 
 The prices and the forecasts of these runs (a time series foundation model) are not part of the repository, so the
-table cannot be reproduced with the example data. The October values of `s1`, `s1b`, `s3`, `s4` and
-`s4o` are computed with the model as it stands here. The other October values stem from runs that planned 25 October
-2026 (clock change, 25 hours) without the look-ahead to the following day; in the rows computed anew this changed
-the result by about 0.1 %.
+table cannot be reproduced with the example data.
 
 ## Data formats
 
